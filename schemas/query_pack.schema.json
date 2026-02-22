@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "version",
+    "mission",
+    "immutable_mission",
+    "keywords",
+    "negative_keywords",
+    "gdelt_query",
+    "source_tiers",
+    "rss_feeds",
+    "report"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer"
+    },
+    "mission": {
+      "type": "string"
+    },
+    "immutable_mission": {
+      "type": "boolean"
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "negative_keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "gdelt_query": {
+      "type": "string"
+    },
+    "source_tiers": {
+      "type": "object"
+    },
+    "rss_feeds": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "report": {
+      "type": "object"
+    }
+  }
+}
