@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "date",
+    "items_collected",
+    "items_selected",
+    "footnotes",
+    "tier_breakdown",
+    "regions",
+    "publishers"
+  ],
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "items_collected": {
+      "type": "integer"
+    },
+    "items_selected": {
+      "type": "integer"
+    },
+    "footnotes": {
+      "type": "integer"
+    },
+    "tier_breakdown": {
+      "type": "object"
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "publishers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
