@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "mission": "Monitor news and humanitarian reporting about displaced people, refugees, asylum seekers, and internally displaced persons (IDPs).",
+  "immutable_mission": true,
+  "keywords": [
+    "refugee",
+    "refugees",
+    "displaced",
+    "displacement",
+    "internally displaced",
+    "IDP",
+    "IDPs",
+    "asylum seeker",
+    "asylum seekers",
+    "forced displacement",
+    "resettlement",
+    "camp"
+  ],
+  "negative_keywords": [
+    "fantasy football",
+    "stock displacement",
+    "lens displacement",
+    "displaced fracture"
+  ],
+  "gdelt_query": "(refugee OR refugees OR \"internally displaced\" OR IDP OR IDPs OR \"asylum seeker\" OR displacement) AND (UNHCR OR IOM OR camp OR asylum OR resettlement OR border)",
+  "source_tiers": {
+    "A": [
+      "reliefweb.int",
+      "unhcr.org",
+      "iom.int",
+      "un.org"
+    ],
+    "B": [
+      "reuters.com",
+      "apnews.com",
+      "bbc.com",
+      "aljazeera.com",
+      "theguardian.com"
+    ],
+    "C": []
+  },
+  "rss_feeds": [
+    {
+      "name": "ReliefWeb",
+      "url": "https://reliefweb.int/updates?advanced-search=%28D48758%29_%28S165%29&format=xml"
+    },
+    {
+      "name": "UNHCR",
+      "url": "https://www.unhcr.org/rss/news.xml"
+    },
+    {
+      "name": "IOM",
+      "url": "https://www.iom.int/rss.xml"
+    }
+  ],
+  "report": {
+    "max_top_developments": 8,
+    "max_exec_bullets": 5
+  }
+}
