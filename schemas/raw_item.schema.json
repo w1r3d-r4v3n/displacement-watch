@@ -83,6 +83,24 @@
         "string",
         "null"
       ]
+    },
+    "country_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "un_region": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provenance_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   }
 }

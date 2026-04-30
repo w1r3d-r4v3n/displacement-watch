@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os, json, datetime as dt
 from . import db as dbmod
+from .geo_tag import ISO_TO_UN_REGION, COUNTRY_NAME_TO_ISO
 
 def _fmt_date(iso: str | None) -> str:
     if not iso:
@@ -41,13 +42,19 @@ def build_report(date_key: str, db_path: str = dbmod.DB_PATH, out_dir: str | Non
         n = cite(r)
         exec_bullets.append(f"- {r['title']}<sup>{n}</sup>")
 
-    by_region = {}
-    region_hints = ["syria","sudan","ukraine","gaza","myanmar","congo","afghanistan","haiti","ethiopia","sahel"]
+    by_region: dict[str, list] = {}
     for r in rows:
-        t = (r["title"] or "").lower() + " " + (r["snippet"] or "").lower()
-        for rg in region_hints:
-            if rg in t:
-                by_region.setdefault(rg.title(), []).append(r)
+        # Use geo-tagged un_region if available; fall back to text heuristic
+        region = r["un_region"] if r["un_region"] else None
+        if not region:
+            # Fallback: scan title+snippet for country names and look up their UN region
+            t = (r["title"] or "").lower() + " " + (r["snippet"] or "").lower()
+            for name, iso in COUNTRY_NAME_TO_ISO.items():
+                if name in t and iso in ISO_TO_UN_REGION:
+                    region = ISO_TO_UN_REGION[iso]
+                    break
+        if region:
+            by_region.setdefault(region, []).append(r)
     top_dev = []
     for r in top_rows:
         n = cite(r)
