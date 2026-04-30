@@ -1,4 +1,5 @@
 const state = { selectedBriefDate: null, selectedCountry: null };
+const PRESET_KEY = "displacement-monitor-presets";
 
 function q(id) { return document.getElementById(id); }
 
@@ -17,17 +18,26 @@ function currentParams() {
   return params;
 }
 
+function syncPathForCountry() {
+  if (state.selectedCountry) {
+    history.replaceState({}, "", `/country/${state.selectedCountry}`);
+  } else {
+    history.replaceState({}, "", "/dashboard");
+  }
+}
+
+function loadPathState() {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  if (parts[0] === "country" && parts[1]) {
+    state.selectedCountry = parts[1].toUpperCase();
+  }
+}
+
 async function fetchJson(path, params = new URLSearchParams()) {
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${path}${suffix}`);
   if (!res.ok) throw new Error(`Failed to load ${path}`);
   return res.json();
-}
-
-function worldToMap(lat, lon, width, height) {
-  const x = ((lon + 180) / 360) * width;
-  const y = ((90 - lat) / 180) * height;
-  return { x, y };
 }
 
 function renderCards(summary) {
@@ -107,24 +117,26 @@ function renderTimeline(timeseries) {
 }
 
 function renderMap(data) {
-  const width = 520;
-  const height = 280;
   const points = data.points || [];
   q("mapView").innerHTML = `
     <div class="map-canvas">
       ${points.map(point => {
-        const pos = worldToMap(point.lat, point.lon, width, height);
-        const size = Math.max(10, Math.min(28, Math.round(8 + point.items * 0.8)));
-        const riskClass = point.risk_score >= 40 ? "high-risk" : "";
-        return `<button class="map-dot ${riskClass}" data-country="${point.country_code}" title="${point.country_code}: ${point.items} items / risk ${point.risk_score}" style="left:${pos.x}px; top:${pos.y}px; width:${size}px; height:${size}px;"></button>`;
+        const riskClass = point.risk_score >= 40 ? "high-risk" : (point.risk_score >= 25 ? "medium-risk" : "");
+        return `<button class="map-dot ${riskClass}" data-country="${point.country_code}" title="${point.country_code}: ${point.items} items / risk ${point.risk_score}">
+          <strong>${point.country_code}</strong>
+          <span>Risk ${point.risk_score}</span>
+          <span>${point.items} items</span>
+          <span>${point.top_signal || "monitor"}</span>
+        </button>`;
       }).join("")}
-      <div class="map-legend">Marker size tracks item volume. Warmer markers indicate higher combined risk.</div>
+      <div class="map-legend">Each tile represents a country in the current dataset. Warmer fills indicate higher combined risk.</div>
     </div>
   `;
   q("mapView").querySelectorAll(".map-dot").forEach(button => {
     button.addEventListener("click", async () => {
       state.selectedCountry = button.dataset.country;
       q("countryFilter").value = state.selectedCountry;
+      syncPathForCountry();
       await Promise.all([refresh(), loadCountryDetail()]);
     });
   });
@@ -163,6 +175,7 @@ function renderCountries(rows) {
   q("countriesTable").querySelectorAll(".country-link").forEach(button => {
     button.addEventListener("click", async () => {
       state.selectedCountry = button.dataset.country;
+      syncPathForCountry();
       await loadCountryDetail();
     });
   });
@@ -170,6 +183,8 @@ function renderCountries(rows) {
 
 function renderCountryDetail(data) {
   q("countryDetailTitle").textContent = data.country_code ? `Country Items — ${data.country_code}` : "Country Items";
+  const signalRows = (data.summary.signal_breakdown || []).slice(0, 5);
+  const eventRows = (data.summary.event_breakdown || []).slice(0, 5);
   q("countryDetailSummary").innerHTML = `
     <div class="status-item"><strong>Items</strong><div class="muted">${data.summary.items}</div></div>
     <div class="status-item"><strong>Average confidence</strong><div class="muted">${data.summary.avg_confidence}</div></div>
@@ -177,6 +192,16 @@ function renderCountryDetail(data) {
     <div class="status-item"><strong>Top event</strong><div class="muted">${data.summary.top_event_type || "n/a"}</div></div>
     <div class="status-item"><strong>Top population</strong><div class="muted">${data.summary.top_population || "n/a"}</div></div>
     <div class="status-item"><strong>External metrics</strong><div class="muted">${(data.summary.external_metrics || []).map(([name, count]) => `${name} (${count})`).join(", ") || "n/a"}</div></div>
+  `;
+  q("countryDetailCharts").innerHTML = `
+    <section class="mini-chart">
+      <h3>Operational signal mix</h3>
+      ${signalRows.map(([name, count]) => `<div class="muted">${name}: ${count}</div>`).join("") || `<div class="muted">n/a</div>`}
+    </section>
+    <section class="mini-chart">
+      <h3>Event type mix</h3>
+      ${eventRows.map(([name, count]) => `<div class="muted">${name}: ${count}</div>`).join("") || `<div class="muted">n/a</div>`}
+    </section>
   `;
   q("countryDetailItems").innerHTML = `<div class="item-list">${
     data.latest_items.map(item => `
@@ -220,7 +245,34 @@ async function loadCountryDetail() {
   }
   const params = new URLSearchParams();
   params.set("country", state.selectedCountry);
+  syncPathForCountry();
   renderCountryDetail(await fetchJson("/api/country-detail", params));
+}
+
+function getPresets() {
+  try {
+    return JSON.parse(localStorage.getItem(PRESET_KEY) || "[]");
+  } catch (_err) {
+    return [];
+  }
+}
+
+function savePresets(presets) {
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+}
+
+function refreshPresetSelect() {
+  const presets = getPresets();
+  q("presetSelect").innerHTML = `<option value="">Choose a saved view</option>${presets.map((preset, idx) => `<option value="${idx}">${preset.name}</option>`).join("")}`;
+}
+
+function applyPreset(preset) {
+  q("countryFilter").value = preset.country || "";
+  q("eventFilter").value = preset.event_type || "";
+  q("populationFilter").value = preset.population_type || "";
+  q("signalFilter").value = preset.signal || "";
+  q("startFilter").value = preset.start || "";
+  q("endFilter").value = preset.end || "";
 }
 
 async function loadFilters() {
@@ -251,15 +303,49 @@ async function refresh() {
   renderTimeline(timeseries);
   renderFlows(flows);
   renderCountries(countries.countries || []);
-  const exportLink = q("exportItemsLink");
-  exportLink.href = `/export/items.csv?${params.toString()}`;
+  q("exportItemsLink").href = `/export/items.csv?${params.toString()}`;
+  if (q("countryFilter").value) {
+    state.selectedCountry = q("countryFilter").value;
+    await loadCountryDetail();
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  loadPathState();
   await loadFilters();
+  if (state.selectedCountry) {
+    q("countryFilter").value = state.selectedCountry;
+  }
+  refreshPresetSelect();
   await Promise.all([refresh(), loadBrief()]);
   for (const id of ["countryFilter", "eventFilter", "populationFilter", "signalFilter", "startFilter", "endFilter"]) {
     q(id).addEventListener("change", refresh);
   }
   q("refreshBtn").addEventListener("click", refresh);
+  q("savePresetBtn").addEventListener("click", () => {
+    const name = window.prompt("Preset name");
+    if (!name) return;
+    const params = Object.fromEntries(currentParams().entries());
+    const presets = getPresets();
+    presets.push({ name, ...params });
+    savePresets(presets);
+    refreshPresetSelect();
+  });
+  q("applyPresetBtn").addEventListener("click", async () => {
+    const idx = q("presetSelect").value;
+    if (idx === "") return;
+    const preset = getPresets()[Number(idx)];
+    if (!preset) return;
+    applyPreset(preset);
+    state.selectedCountry = preset.country || null;
+    await refresh();
+  });
+  q("deletePresetBtn").addEventListener("click", () => {
+    const idx = q("presetSelect").value;
+    if (idx === "") return;
+    const presets = getPresets();
+    presets.splice(Number(idx), 1);
+    savePresets(presets);
+    refreshPresetSelect();
+  });
 });

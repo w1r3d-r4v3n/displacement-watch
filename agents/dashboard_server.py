@@ -63,7 +63,7 @@ def run_dashboard_server(db_path: str = dbmod.DB_PATH, host: str = "127.0.0.1", 
             params = self._query_params()
             route = parsed.path
 
-            if route in ("/", "/dashboard"):
+            if route in ("/", "/dashboard") or route.startswith("/country/"):
                 return self._send_file(os.path.join(asset_root, "dashboard.html"), "text/html; charset=utf-8")
             if route == "/static/app.js":
                 return self._send_file(os.path.join(asset_root, "app.js"), "application/javascript; charset=utf-8")

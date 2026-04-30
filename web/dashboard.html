@@ -23,6 +23,7 @@
     <div class="panel-head">
       <h2>Filters</h2>
       <div class="action-row">
+        <button id="savePresetBtn" type="button">Save preset</button>
         <a id="exportItemsLink" href="/export/items.csv">Export filtered CSV</a>
         <button id="refreshBtn" type="button">Refresh</button>
       </div>
@@ -47,6 +48,13 @@
         <input id="endFilter" type="date">
       </label>
     </div>
+    <div class="preset-row">
+      <label>Saved presets
+        <select id="presetSelect"><option value="">Choose a saved view</option></select>
+      </label>
+      <button id="applyPresetBtn" type="button">Apply</button>
+      <button id="deletePresetBtn" type="button">Delete</button>
+    </div>
   </section>
 
   <section class="cards" id="summaryCards"></section>
@@ -54,8 +62,8 @@
   <section class="layout">
     <article class="panel">
       <div class="panel-head">
-        <h2>Geographic Hotspots</h2>
-        <span class="muted">Click a marker to drill down</span>
+        <h2>Risk Surface</h2>
+        <span class="muted">Tile-style choropleth with drill-down</span>
       </div>
       <div id="mapView" class="map-box"></div>
     </article>
@@ -129,6 +137,7 @@
       <div class="panel-head">
         <h2 id="countryDetailTitle">Country Items</h2>
       </div>
+      <div id="countryDetailCharts" class="chart-grid"></div>
       <div id="countryDetailItems"></div>
     </article>
   </section>
