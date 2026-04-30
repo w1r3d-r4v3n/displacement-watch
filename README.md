@@ -1,4 +1,4 @@
-# Displacement Watch v2
+# Displacement Monitor
 
 A multi-agent monitoring pipeline for displaced people/refugee coverage in news and humanitarian sources, with research-grade data exports and predictive analytics.
 
