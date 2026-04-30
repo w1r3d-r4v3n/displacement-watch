@@ -4,6 +4,7 @@ from dateutil import parser as dtparser
 from typing import Any
 from .utils import canonicalize_url, stable_id, norm_text, has_negative, keyword_hits, domain_from_url, provenance_hash, dedup_near_duplicates
 from .geo_tag import tag_items_batch
+from .classify import classify_item
 from . import db as dbmod
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
@@ -162,6 +163,7 @@ def collect_and_persist(db_path: str, since_hours: int = 24, max_gdelt: int = 10
 
     # Enrich items with country codes and UN region
     items = tag_items_batch(items)
+    items = [classify_item(it) for it in items]
 
     # Attach provenance hash
     qp_version = q.get("version", 0)
@@ -367,6 +369,7 @@ def backfill_date(
 
     # Geo-tag and add provenance
     items = tag_items_batch(items)
+    items = [classify_item(it) for it in items]
     qp_version = q.get("version", 0)
     for it in items:
         it["provenance_hash"] = provenance_hash(qp_version, run_id)

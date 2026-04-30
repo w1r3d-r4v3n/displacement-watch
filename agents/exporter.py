@@ -28,6 +28,15 @@ CODEBOOK = """# Displacement Watch — Research Data Codebook
 | country_codes | TEXT | Pipe-delimited ISO 3166-1 alpha-2 codes extracted from text/GDELT |
 | un_region | TEXT | UN macro-region (e.g. "Western Asia", "Sub-Saharan Africa") |
 | provenance_hash | TEXT | SHA256(query_pack_version + collection_run_id)[:16] for reproducibility |
+| event_type | TEXT | Structured article coding for event or development type |
+| population_type | TEXT | Main affected population category |
+| driver | TEXT | Inferred displacement driver |
+| displacement_stage | TEXT | Acute movement, ongoing, returns/restrictions, or response/protection |
+| location_precision | TEXT | unknown, national, subnational, or regional |
+| operational_signal | TEXT | Field-oriented signal label such as access_constraint or funding_gap |
+| coverage_confidence | REAL | Heuristic confidence score for triage and filtering |
+| research_priority | TEXT | high or medium research relevance |
+| field_priority | TEXT | high, medium, or monitor operational urgency |
 | score | REAL | (selected.csv only) Ranking score: tier_weight + keyword_bonus + recency_decay |
 | selection_date | TEXT | (selected.csv only) Date this item was selected for the daily brief |
 
@@ -106,7 +115,9 @@ def export_items_csv(
         "id", "canonical_url", "url", "title", "publisher", "domain",
         "published_at", "retrieved_at", "snippet", "language",
         "tier", "source_type", "keywords_hit", "collection_run_id",
-        "country_codes", "un_region", "provenance_hash",
+        "country_codes", "un_region", "provenance_hash", "event_type", "population_type",
+        "driver", "displacement_stage", "location_precision", "operational_signal",
+        "coverage_confidence", "research_priority", "field_priority",
     ]
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -153,7 +164,9 @@ def export_selected_csv(
         "id", "canonical_url", "url", "title", "publisher", "domain",
         "published_at", "retrieved_at", "snippet", "language",
         "tier", "source_type", "keywords_hit", "collection_run_id",
-        "country_codes", "un_region", "provenance_hash",
+        "country_codes", "un_region", "provenance_hash", "event_type", "population_type",
+        "driver", "displacement_stage", "location_precision", "operational_signal",
+        "coverage_confidence", "research_priority", "field_priority",
         "score", "selection_date",
     ]
     with open(out_path, "w", newline="", encoding="utf-8") as f:

@@ -2,6 +2,7 @@ from __future__ import annotations
 import os, json, datetime as dt
 from . import db as dbmod
 from .geo_tag import ISO_TO_UN_REGION, COUNTRY_NAME_TO_ISO
+from .classify import summarize_classifications
 
 def _fmt_date(iso: str | None) -> str:
     if not iso:
@@ -77,6 +78,17 @@ def build_report(date_key: str, db_path: str = dbmod.DB_PATH, out_dir: str | Non
             n = cite(rs[0])
             lines.append(f"- **{rg}:** {len(rs)} relevant item(s); representative item: {rs[0]['title']}<sup>{n}</sup>")
         lines.append("")
+    summaries = summarize_classifications([dict(r) for r in rows])
+    lines.append("## Operational Signals")
+    for signal, count in summaries["signals"][:4]:
+        lines.append(f"- **{signal.replace('_', ' ').title()}:** {count} item(s) in the selected set.")
+    lines.append("")
+    lines.append("## Research Notes")
+    for event_type, count in summaries["event_types"][:4]:
+        lines.append(f"- **{event_type.replace('_', ' ').title()}:** {count} item(s), useful for coding comparative case trends.")
+    for driver, count in summaries["drivers"][:3]:
+        lines.append(f"- **Driver signal: {driver.replace('_', ' ').title()}** appears in {count} selected item(s).")
+    lines.append("")
     lines.append("## What to Watch")
     lines.append("- Any changes in asylum policy language, border measures, or returns framing across major outlets.")
     lines.append("- Whether humanitarian funding shortfalls or aid access constraints recur across multiple regions.")
@@ -103,5 +115,7 @@ def build_report(date_key: str, db_path: str = dbmod.DB_PATH, out_dir: str | Non
         "tier_breakdown": {},
         "regions": sorted(by_region.keys()),
         "publishers": sorted({(r['publisher'] or r['domain'] or 'Unknown') for r in rows}),
+        "signals": summaries["signals"],
+        "event_types": summaries["event_types"],
     }
     return report_path, meta

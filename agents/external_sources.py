@@ -33,6 +33,15 @@ _ISO3_TO_ISO2: dict[str, str] = {
     "ZMB": "ZM", "ZWE": "ZW",
 }
 
+_COUNTRY_NAME_TO_ISO2: dict[str, str] = {
+    "afghanistan": "AF", "bangladesh": "BD", "burkina faso": "BF", "cameroon": "CM",
+    "central african republic": "CF", "chad": "TD", "colombia": "CO", "democratic republic of congo": "CD",
+    "drc": "CD", "ethiopia": "ET", "haiti": "HT", "iraq": "IQ", "lebanon": "LB",
+    "libya": "LY", "mali": "ML", "mozambique": "MZ", "myanmar": "MM", "nigeria": "NG",
+    "pakistan": "PK", "palestine": "PS", "somalia": "SO", "south sudan": "SS", "sudan": "SD",
+    "syria": "SY", "ukraine": "UA", "uganda": "UG", "venezuela": "VE", "yemen": "YE",
+}
+
 _NOW = lambda: dt.datetime.utcnow().isoformat() + "Z"
 
 
@@ -40,6 +49,18 @@ def _stable_id(source: str, country: str, date: str, metric: str) -> str:
     import hashlib
     key = f"{source}:{country}:{date}:{metric}"
     return hashlib.sha256(key.encode()).hexdigest()[:20]
+
+
+def _country_name_to_iso2(name: str) -> str:
+    key = (name or "").strip().lower()
+    if not key:
+        return ""
+    if key in _COUNTRY_NAME_TO_ISO2:
+        return _COUNTRY_NAME_TO_ISO2[key]
+    for needle, iso2 in _COUNTRY_NAME_TO_ISO2.items():
+        if needle in key:
+            return iso2
+    return ""
 
 
 def fetch_idmc(
@@ -89,7 +110,7 @@ def fetch_idmc(
         if not year:
             continue
         event_date = f"{int(year)}-01-01"
-        stock = row.get("conflict_stock_displacement") or row.get("new_displacements")
+        stock = row.get("conflict_stock_displacement")
         if stock is None:
             continue
         results.append({
@@ -166,16 +187,10 @@ def fetch_acled(
     results = []
     for row in data.get("data", []):
         iso_num = str(row.get("iso", ""))
-        # ACLED uses ISO numeric; map common ones. Fall back to country field.
         event_date = row.get("event_date", "")
         fatalities = row.get("fatalities")
         country_name = row.get("country", "")
-        # Try to get alpha-2 from ISO3 if available
-        iso2 = ""
-        for iso3, i2 in _ISO3_TO_ISO2.items():
-            if country_name and country_name.lower() in iso3.lower():
-                iso2 = i2
-                break
+        iso2 = _country_name_to_iso2(country_name)
         results.append({
             "id": _stable_id("acled", row.get("event_id_cnty", iso_num), event_date, "fatalities"),
             "source": "acled",

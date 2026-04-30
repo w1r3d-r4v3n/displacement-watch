@@ -108,6 +108,15 @@ def init_db(db_path: str = DB_PATH) -> None:
     _safe_alter(conn, "ALTER TABLE items ADD COLUMN un_region TEXT")
     _safe_alter(conn, "ALTER TABLE items ADD COLUMN anomaly_score REAL")
     _safe_alter(conn, "ALTER TABLE items ADD COLUMN provenance_hash TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN event_type TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN population_type TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN driver TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN displacement_stage TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN location_precision TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN operational_signal TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN coverage_confidence REAL")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN research_priority TEXT")
+    _safe_alter(conn, "ALTER TABLE items ADD COLUMN field_priority TEXT")
     conn.commit()
     conn.close()
 
@@ -119,8 +128,10 @@ def upsert_items(conn: sqlite3.Connection, items: Iterable[dict[str, Any]]) -> i
             '''INSERT INTO items (
                 id, canonical_url, url, title, publisher, domain, published_at, retrieved_at, snippet, full_text,
                 language, tier, source_type, keywords_hit_json, collection_run_id,
-                country_codes_json, un_region, provenance_hash
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                country_codes_json, un_region, provenance_hash, event_type, population_type,
+                driver, displacement_stage, location_precision, operational_signal,
+                coverage_confidence, research_priority, field_priority
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                 canonical_url=excluded.canonical_url,
                 url=excluded.url,
@@ -138,7 +149,16 @@ def upsert_items(conn: sqlite3.Connection, items: Iterable[dict[str, Any]]) -> i
                 collection_run_id=excluded.collection_run_id,
                 country_codes_json=COALESCE(excluded.country_codes_json, items.country_codes_json),
                 un_region=COALESCE(excluded.un_region, items.un_region),
-                provenance_hash=COALESCE(excluded.provenance_hash, items.provenance_hash)
+                provenance_hash=COALESCE(excluded.provenance_hash, items.provenance_hash),
+                event_type=COALESCE(excluded.event_type, items.event_type),
+                population_type=COALESCE(excluded.population_type, items.population_type),
+                driver=COALESCE(excluded.driver, items.driver),
+                displacement_stage=COALESCE(excluded.displacement_stage, items.displacement_stage),
+                location_precision=COALESCE(excluded.location_precision, items.location_precision),
+                operational_signal=COALESCE(excluded.operational_signal, items.operational_signal),
+                coverage_confidence=COALESCE(excluded.coverage_confidence, items.coverage_confidence),
+                research_priority=COALESCE(excluded.research_priority, items.research_priority),
+                field_priority=COALESCE(excluded.field_priority, items.field_priority)
             ''',
             (
                 it["id"], it.get("canonical_url"), it["url"], it["title"], it.get("publisher"), it.get("domain"),
@@ -148,6 +168,15 @@ def upsert_items(conn: sqlite3.Connection, items: Iterable[dict[str, Any]]) -> i
                 json.dumps(it.get("country_codes", [])) if it.get("country_codes") is not None else None,
                 it.get("un_region"),
                 it.get("provenance_hash"),
+                it.get("event_type"),
+                it.get("population_type"),
+                it.get("driver"),
+                it.get("displacement_stage"),
+                it.get("location_precision"),
+                it.get("operational_signal"),
+                it.get("coverage_confidence"),
+                it.get("research_priority"),
+                it.get("field_priority"),
             )
         )
         n += 1
