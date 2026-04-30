@@ -9,6 +9,71 @@ from agents.writer import build_report
 from agents.editor import qa_and_append
 from agents.export_docx import markdown_to_docx
 
+def cmd_status(args):
+    if not os.path.exists(args.db):
+        raise SystemExit(f"Database not found: {args.db}. Run init-db first.")
+    conn = dbmod.connect(args.db)
+
+    total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+    row = conn.execute(
+        "SELECT MIN(COALESCE(published_at,retrieved_at)), MAX(COALESCE(published_at,retrieved_at)) FROM items"
+    ).fetchone()
+    date_min = (row[0] or "")[:10] or "—"
+    date_max = (row[1] or "")[:10] or "—"
+
+    tiers = {r[0] or "U": r[1] for r in conn.execute(
+        "SELECT tier, COUNT(*) FROM items GROUP BY tier ORDER BY tier"
+    ).fetchall()}
+
+    top_pubs = conn.execute(
+        "SELECT COALESCE(publisher, domain, 'Unknown'), COUNT(*) FROM items "
+        "GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+    ).fetchall()
+
+    selected_total = conn.execute("SELECT COUNT(*) FROM daily_selected").fetchone()[0]
+    selected_days = conn.execute("SELECT COUNT(DISTINCT date) FROM daily_selected").fetchone()[0]
+
+    last_run = conn.execute(
+        "SELECT run_id, finished_at, items_fetched, items_new FROM collection_runs "
+        "ORDER BY finished_at DESC LIMIT 1"
+    ).fetchone()
+
+    anomalies = conn.execute(
+        "SELECT date, ROUND(zscore,2) FROM daily_volume WHERE is_anomaly=1 ORDER BY date DESC LIMIT 5"
+    ).fetchall()
+
+    volume_today = conn.execute(
+        "SELECT item_count, selected_count FROM daily_volume WHERE date=?",
+        (dt.datetime.utcnow().date().isoformat(),)
+    ).fetchone()
+
+    conn.close()
+
+    print(f"\n{'='*42}")
+    print(f"  Displacement Monitor — DB Status")
+    print(f"{'='*42}")
+    print(f"  Database  : {args.db}")
+    print(f"  Items     : {total:,}  ({date_min} → {date_max})")
+    tier_str = "  ".join(f"{t}:{n}" for t, n in sorted(tiers.items()))
+    print(f"  Tiers     : {tier_str}")
+    print(f"  Selected  : {selected_total:,} across {selected_days} day(s)")
+    if volume_today:
+        print(f"  Today     : {volume_today[0]} collected, {volume_today[1]} selected")
+    print(f"\n  Top publishers (all time):")
+    for pub, cnt in top_pubs:
+        print(f"    {cnt:>5}  {pub}")
+    if last_run:
+        finished = (last_run[1] or "")[:19].replace("T", " ")
+        print(f"\n  Last run  : {last_run[0]}  ({finished})")
+        print(f"             fetched={last_run[2]}  new={last_run[3]}")
+    else:
+        print(f"\n  Last run  : none recorded")
+    if anomalies:
+        print(f"\n  Anomaly days (recent): {', '.join(f'{d} (z={z})' for d, z in anomalies)}")
+    else:
+        print(f"\n  No anomaly days detected (run analyze-trends to compute)")
+    print(f"{'='*42}\n")
+
 def cmd_init_db(args):
     dbmod.init_db(args.db)
     print(f"Initialized DB at {args.db}")
@@ -238,6 +303,9 @@ def build_parser():
     p = argparse.ArgumentParser(description="Displacement Watch v2 CLI")
     p.add_argument("--db", default="displacement_watch.db")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    a = sub.add_parser("status", help="Show database statistics at a glance")
+    a.set_defaults(func=cmd_status)
 
     a = sub.add_parser("init-db")
     a.set_defaults(func=cmd_init_db)

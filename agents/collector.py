@@ -2,7 +2,7 @@ from __future__ import annotations
 import json, datetime as dt, requests, feedparser
 from dateutil import parser as dtparser
 from typing import Any
-from .utils import canonicalize_url, stable_id, norm_text, has_negative, keyword_hits, domain_from_url, provenance_hash
+from .utils import canonicalize_url, stable_id, norm_text, has_negative, keyword_hits, domain_from_url, provenance_hash, dedup_near_duplicates
 from .geo_tag import tag_items_batch
 from . import db as dbmod
 
@@ -156,6 +156,9 @@ def collect_and_persist(db_path: str, since_hours: int = 24, max_gdelt: int = 10
             if score_item(it) > score_item(dedup[key]):
                 dedup[key] = it
     items = list(dedup.values())
+
+    # Near-duplicate suppression: same story from multiple wire-service reposts
+    items = dedup_near_duplicates(items, score_item)
 
     # Enrich items with country codes and UN region
     items = tag_items_batch(items)
@@ -360,6 +363,7 @@ def backfill_date(
         if key not in dedup or score_item(it) > score_item(dedup[key]):
             dedup[key] = it
     items = list(dedup.values())
+    items = dedup_near_duplicates(items, score_item)
 
     # Geo-tag and add provenance
     items = tag_items_batch(items)

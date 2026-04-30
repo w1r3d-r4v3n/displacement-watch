@@ -40,6 +40,29 @@ def domain_from_url(url: str) -> str:
     except Exception:
         return ""
 
+def title_jaccard(t1: str, t2: str) -> float:
+    """Jaccard similarity on word sets; used for near-duplicate detection."""
+    w1 = set((t1 or "").lower().split())
+    w2 = set((t2 or "").lower().split())
+    if not w1 or not w2:
+        return 0.0
+    return len(w1 & w2) / len(w1 | w2)
+
+def dedup_near_duplicates(items: list, score_fn, threshold: float = 0.75) -> list:
+    """Remove near-duplicate items by title similarity, keeping the highest-scored version."""
+    kept: list = []
+    for item in items:
+        matched = False
+        for i, k in enumerate(kept):
+            if title_jaccard(item.get("title", ""), k.get("title", "")) >= threshold:
+                if score_fn(item) > score_fn(k):
+                    kept[i] = item
+                matched = True
+                break
+        if not matched:
+            kept.append(item)
+    return kept
+
 def provenance_hash(version: int, run_id: str) -> str:
     """Stable 16-char identifier tying items to a specific query_pack version + run."""
     h = hashlib.sha256()
