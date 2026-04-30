@@ -39,3 +39,10 @@ def domain_from_url(url: str) -> str:
         return urlparse(url).netloc.lower().replace("www.","")
     except Exception:
         return ""
+
+def provenance_hash(version: int, run_id: str) -> str:
+    """Stable 16-char identifier tying items to a specific query_pack version + run."""
+    h = hashlib.sha256()
+    h.update(str(version).encode())
+    h.update(run_id.encode())
+    return h.hexdigest()[:16]

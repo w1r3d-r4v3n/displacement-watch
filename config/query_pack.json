@@ -56,5 +56,6 @@
   "report": {
     "max_top_developments": 8,
     "max_exec_bullets": 5
-  }
+  },
+  "tool_version": "2.1.0"
 }

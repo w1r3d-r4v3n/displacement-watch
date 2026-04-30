@@ -48,6 +48,9 @@
     },
     "report": {
       "type": "object"
+    },
+    "tool_version": {
+      "type": "string"
     }
   }
 }

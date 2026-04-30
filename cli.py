@@ -1,9 +1,9 @@
 from __future__ import annotations
-import argparse, os, json, datetime as dt
+import argparse, os, json, datetime as dt, time
 from jsonschema import validate as js_validate
 
 from agents import db as dbmod
-from agents.collector import collect_and_persist
+from agents.collector import collect_and_persist, backfill_date
 from agents.refiner import propose
 from agents.writer import build_report
 from agents.editor import qa_and_append
@@ -84,9 +84,155 @@ def cmd_validate(args):
     print(f"Report validated: {report_path}")
 
 def cmd_backfill(args):
-    # Stub scaffold: iterate dates, run collector/writer/editor. Historical coverage depends on source support.
     dbmod.init_db(args.db)
-    print(f"Backfill scaffold: start={args.start} end={args.end} (implement source-specific backfill for RSS/GDELT).")
+    start = dt.date.fromisoformat(args.start)
+    end = dt.date.fromisoformat(args.end)
+    source = args.source
+    dry_run = args.dry_run
+
+    dates = [(start + dt.timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+    total_inserted = 0
+
+    for i, d in enumerate(dates):
+        if dry_run:
+            print(f"[dry-run] would backfill {d} (source={source})")
+            continue
+        result = backfill_date(args.db, d, source=source, max_gdelt=args.max_gdelt)
+        total_inserted += result.get("inserted", 0)
+        print(f"[backfill] {d} inserted={result['inserted']}")
+        # Courtesy delay between GDELT requests
+        if i < len(dates) - 1 and source in ("gdelt", "all"):
+            time.sleep(1.0)
+
+    print(f"Backfill complete. Total inserted/updated: {total_inserted}")
+
+def cmd_export_csv(args):
+    dbmod.init_db(args.db)
+    from agents.exporter import export_items_csv, export_selected_csv
+
+    out = args.out
+    stem, ext = os.path.splitext(out)
+    ext = ext or ".csv"
+
+    if args.type in ("items", "both"):
+        path = f"{stem}_items{ext}" if args.type == "both" else out
+        result = export_items_csv(args.db, path, args.start, args.end, args.country)
+        print(json.dumps(result))
+
+    if args.type in ("selected", "both"):
+        path = f"{stem}_selected{ext}" if args.type == "both" else out
+        result = export_selected_csv(args.db, path, args.start, args.end)
+        print(json.dumps(result))
+
+def cmd_export_trends(args):
+    dbmod.init_db(args.db)
+    from agents.exporter import export_trends_json
+    result = export_trends_json(args.db, args.out, args.start, args.end)
+    print(json.dumps(result))
+
+def cmd_analyze_trends(args):
+    dbmod.init_db(args.db)
+    from agents.analytics import compute_all_analytics, country_volume_series
+
+    result = compute_all_analytics(args.db, window_days=args.window_days)
+
+    if args.country:
+        conn = dbmod.connect(args.db)
+        result["country_series"] = country_volume_series(conn, args.country, args.window_days)
+        conn.close()
+
+    out_path = args.out or os.path.join("data", dt.datetime.utcnow().date().isoformat(), "analytics.json")
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+
+    print(f"Analytics written to {out_path}")
+    print(f"  Anomaly days: {result['anomaly_days']}  Velocity spikes: {result['spike_days']}")
+    if result["keyword_velocity"]:
+        top3 = result["keyword_velocity"][:3]
+        print(f"  Top keyword velocity: {top3}")
+
+def cmd_fetch_external(args):
+    dbmod.init_db(args.db)
+    from agents.external_sources import fetch_idmc, fetch_acled, fetch_unhcr_stats
+
+    countries = [c.strip() for c in args.countries.split(",")] if args.countries else None
+    conn = dbmod.connect(args.db)
+    total = 0
+
+    if args.source in ("idmc", "all"):
+        print("[fetch-external] Fetching IDMC...")
+        events = fetch_idmc(
+            country_iso3s=countries,
+            year_from=args.year_from,
+            year_to=args.year_to,
+        )
+        n = dbmod.upsert_external_events(conn, events)
+        total += n
+        print(f"  IDMC: {n} records inserted/updated")
+
+    if args.source in ("unhcr", "all"):
+        print("[fetch-external] Fetching UNHCR Stats...")
+        events = fetch_unhcr_stats(year_from=args.year_from, year_to=args.year_to)
+        n = dbmod.upsert_external_events(conn, events)
+        total += n
+        print(f"  UNHCR: {n} records inserted/updated")
+
+    if args.source in ("acled", "all"):
+        key = args.acled_key or os.environ.get("ACLED_API_KEY")
+        mail = args.acled_email or os.environ.get("ACLED_EMAIL")
+        if not key or not mail:
+            print("[fetch-external] Skipping ACLED: ACLED_API_KEY and ACLED_EMAIL required.")
+        else:
+            print("[fetch-external] Fetching ACLED...")
+            events = fetch_acled(
+                api_key=key,
+                email=mail,
+                date_range_start=f"{args.year_from}-01-01" if args.year_from else None,
+                date_range_end=f"{args.year_to}-12-31" if args.year_to else None,
+            )
+            n = dbmod.upsert_external_events(conn, events)
+            total += n
+            print(f"  ACLED: {n} records inserted/updated")
+
+    conn.close()
+    print(f"Total external records inserted/updated: {total}")
+
+def cmd_export_citations(args):
+    dbmod.init_db(args.db)
+    from agents.cite import report_to_bibtex, report_to_ris, items_to_bibtex, items_to_ris
+
+    if args.date:
+        if args.format == "bibtex":
+            content = report_to_bibtex(args.date, args.db)
+        else:
+            content = report_to_ris(args.date, args.db)
+    else:
+        conn = dbmod.connect(args.db)
+        rows = dbmod.get_all_items(conn, args.start, args.end)
+        conn.close()
+        if args.format == "bibtex":
+            content = items_to_bibtex(rows)
+        else:
+            content = items_to_ris(rows)
+
+    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+    with open(args.out, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Citations written to {args.out}")
+
+def cmd_export_research_package(args):
+    dbmod.init_db(args.db)
+    from agents.exporter import build_research_package
+    manifest = build_research_package(
+        args.db,
+        args.out,
+        start_iso=args.start,
+        end_iso=args.end,
+        include_external=args.include_external,
+    )
+    print(f"Research package written to {args.out}")
+    print(f"  Files: {list(manifest['files'].keys())}")
 
 def build_parser():
     p = argparse.ArgumentParser(description="Displacement Watch v2 CLI")
@@ -110,7 +256,55 @@ def build_parser():
     a = sub.add_parser("backfill")
     a.add_argument("--start", required=True)
     a.add_argument("--end", required=True)
+    a.add_argument("--source", default="all", choices=["gdelt", "reliefweb", "all"])
+    a.add_argument("--max-gdelt", type=int, default=250)
+    a.add_argument("--dry-run", action="store_true")
     a.set_defaults(func=cmd_backfill)
+
+    a = sub.add_parser("export-csv", help="Export collected items to CSV")
+    a.add_argument("--out", required=True, help="Output CSV path")
+    a.add_argument("--start", default=None)
+    a.add_argument("--end", default=None)
+    a.add_argument("--country", default=None, help="ISO alpha-2 country code filter")
+    a.add_argument("--type", default="items", choices=["items", "selected", "both"])
+    a.set_defaults(func=cmd_export_csv)
+
+    a = sub.add_parser("export-trends", help="Export trend statistics to JSON")
+    a.add_argument("--out", required=True, help="Output JSON path")
+    a.add_argument("--start", default=None)
+    a.add_argument("--end", default=None)
+    a.set_defaults(func=cmd_export_trends)
+
+    a = sub.add_parser("analyze-trends", help="Compute predictive analytics (z-scores, velocity spikes)")
+    a.add_argument("--window-days", type=int, default=90)
+    a.add_argument("--out", default=None, help="Output JSON path (default: data/<today>/analytics.json)")
+    a.add_argument("--country", default=None, help="Also produce per-country volume series (ISO alpha-2)")
+    a.set_defaults(func=cmd_analyze_trends)
+
+    a = sub.add_parser("fetch-external", help="Fetch external datasets (IDMC, ACLED, UNHCR Stats)")
+    a.add_argument("--source", required=True, choices=["idmc", "acled", "unhcr", "all"])
+    a.add_argument("--countries", default=None, help="Comma-separated ISO3 country codes")
+    a.add_argument("--year-from", type=int, default=2018)
+    a.add_argument("--year-to", type=int, default=None)
+    a.add_argument("--acled-key", default=None)
+    a.add_argument("--acled-email", default=None)
+    a.set_defaults(func=cmd_fetch_external)
+
+    a = sub.add_parser("export-citations", help="Export citations in BibTeX or RIS format")
+    a.add_argument("--format", required=True, choices=["bibtex", "ris"])
+    a.add_argument("--out", required=True, help="Output file path")
+    a.add_argument("--date", default=None, help="Export citations for a specific daily brief date")
+    a.add_argument("--start", default=None, help="Date range start (alternative to --date)")
+    a.add_argument("--end", default=None)
+    a.set_defaults(func=cmd_export_citations)
+
+    a = sub.add_parser("export-research-package", help="Bundle all exports into a research data package")
+    a.add_argument("--out", required=True, help="Output directory path")
+    a.add_argument("--start", default=None)
+    a.add_argument("--end", default=None)
+    a.add_argument("--include-external", action="store_true", help="Include external_events.csv")
+    a.set_defaults(func=cmd_export_research_package)
+
     return p
 
 if __name__ == "__main__":
