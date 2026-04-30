@@ -73,10 +73,13 @@ The browser dashboard is a local-first view over `displacement_monitor.db`. It i
 
 Current dashboard views include:
 - summary cards for items, reports, anomalies, and confidence
+- a lightweight geographic hotspot map for country drill-down
 - a coverage timeline with external metric overlays
 - source freshness cards for external data providers
 - `Origins` and `Hosts` displacement tables with simple crisis badges
-- country summary tables with top signals and event types
+- country summary tables with top signals, event types, and a combined risk score
+- country drill-down panels with recent items and external metric summaries
+- filtered CSV export directly from the browser dashboard
 - a daily brief viewer for generated markdown reports
 
 Run:

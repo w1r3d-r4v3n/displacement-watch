@@ -8,10 +8,13 @@ from urllib.parse import parse_qs, urlparse
 
 from . import db as dbmod
 from .dashboard_data import (
+    build_export_csv_bytes,
     get_briefs,
+    get_country_detail,
     get_country_summary,
     get_displacement_flows,
     get_filter_options,
+    get_map_points,
     get_overview,
     get_timeseries,
 )
@@ -39,6 +42,15 @@ def run_dashboard_server(db_path: str = dbmod.DB_PATH, host: str = "127.0.0.1", 
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def _send_bytes(self, raw: bytes, content_type: str, filename: str | None = None) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(raw)))
+            if filename:
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
             self.end_headers()
             self.wfile.write(raw)
 
@@ -83,14 +95,29 @@ def run_dashboard_server(db_path: str = dbmod.DB_PATH, host: str = "127.0.0.1", 
                         end=params.get("end"),
                     )}
                 )
+            if route == "/api/country-detail":
+                country = params.get("country")
+                if not country:
+                    return self._send_json({"error": "country is required"}, status=HTTPStatus.BAD_REQUEST)
+                return self._send_json(get_country_detail(db_path, country))
             if route == "/api/timeseries":
                 return self._send_json(
                     get_timeseries(db_path, country=params.get("country"), start=params.get("start"), end=params.get("end"))
                 )
+            if route == "/api/map":
+                return self._send_json(get_map_points(db_path, start=params.get("start"), end=params.get("end")))
             if route == "/api/displacement":
                 return self._send_json(get_displacement_flows(db_path))
             if route == "/api/briefs":
                 return self._send_json(get_briefs(db_path, date=params.get("date")))
+            if route == "/export/items.csv":
+                raw = build_export_csv_bytes(
+                    db_path,
+                    country=params.get("country"),
+                    start=params.get("start"),
+                    end=params.get("end"),
+                )
+                return self._send_bytes(raw, "text/csv; charset=utf-8", "displacement-monitor-items.csv")
 
             self._send_json({"error": "Not found", "path": route}, status=HTTPStatus.NOT_FOUND)
 

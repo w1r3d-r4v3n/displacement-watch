@@ -1,4 +1,4 @@
-const state = { selectedBriefDate: null };
+const state = { selectedBriefDate: null, selectedCountry: null };
 
 function q(id) { return document.getElementById(id); }
 
@@ -22,6 +22,12 @@ async function fetchJson(path, params = new URLSearchParams()) {
   const res = await fetch(`${path}${suffix}`);
   if (!res.ok) throw new Error(`Failed to load ${path}`);
   return res.json();
+}
+
+function worldToMap(lat, lon, width, height) {
+  const x = ((lon + 180) / 360) * width;
+  const y = ((90 - lat) / 180) * height;
+  return { x, y };
 }
 
 function renderCards(summary) {
@@ -100,6 +106,30 @@ function renderTimeline(timeseries) {
   `;
 }
 
+function renderMap(data) {
+  const width = 520;
+  const height = 280;
+  const points = data.points || [];
+  q("mapView").innerHTML = `
+    <div class="map-canvas">
+      ${points.map(point => {
+        const pos = worldToMap(point.lat, point.lon, width, height);
+        const size = Math.max(10, Math.min(28, Math.round(8 + point.items * 0.8)));
+        const riskClass = point.risk_score >= 40 ? "high-risk" : "";
+        return `<button class="map-dot ${riskClass}" data-country="${point.country_code}" title="${point.country_code}: ${point.items} items / risk ${point.risk_score}" style="left:${pos.x}px; top:${pos.y}px; width:${size}px; height:${size}px;"></button>`;
+      }).join("")}
+      <div class="map-legend">Marker size tracks item volume. Warmer markers indicate higher combined risk.</div>
+    </div>
+  `;
+  q("mapView").querySelectorAll(".map-dot").forEach(button => {
+    button.addEventListener("click", async () => {
+      state.selectedCountry = button.dataset.country;
+      q("countryFilter").value = state.selectedCountry;
+      await Promise.all([refresh(), loadCountryDetail()]);
+    });
+  });
+}
+
 function renderTable(targetId, rows, columns) {
   q(targetId).innerHTML = `
     <table>
@@ -121,14 +151,42 @@ function renderFlows(flows) {
 
 function renderCountries(rows) {
   renderTable("countriesTable", rows, [
-    { label: "Country", render: row => row.country_code },
+    { label: "Country", render: row => `<button type="button" class="country-link" data-country="${row.country_code}">${row.country_code}</button>` },
     { label: "Items", render: row => row.items.toLocaleString() },
+    { label: "Risk", render: row => row.risk_score.toFixed(1) },
     { label: "Confidence", render: row => row.avg_confidence.toFixed(2) },
     { label: "Top signal", render: row => row.top_signal || "n/a" },
     { label: "Top event", render: row => row.top_event_type || "n/a" },
     { label: "Population", render: row => row.top_population || "n/a" },
     { label: "Latest", render: row => row.latest_date || "n/a" },
   ]);
+  q("countriesTable").querySelectorAll(".country-link").forEach(button => {
+    button.addEventListener("click", async () => {
+      state.selectedCountry = button.dataset.country;
+      await loadCountryDetail();
+    });
+  });
+}
+
+function renderCountryDetail(data) {
+  q("countryDetailTitle").textContent = data.country_code ? `Country Items — ${data.country_code}` : "Country Items";
+  q("countryDetailSummary").innerHTML = `
+    <div class="status-item"><strong>Items</strong><div class="muted">${data.summary.items}</div></div>
+    <div class="status-item"><strong>Average confidence</strong><div class="muted">${data.summary.avg_confidence}</div></div>
+    <div class="status-item"><strong>Top signal</strong><div class="muted">${data.summary.top_signal || "n/a"}</div></div>
+    <div class="status-item"><strong>Top event</strong><div class="muted">${data.summary.top_event_type || "n/a"}</div></div>
+    <div class="status-item"><strong>Top population</strong><div class="muted">${data.summary.top_population || "n/a"}</div></div>
+    <div class="status-item"><strong>External metrics</strong><div class="muted">${(data.summary.external_metrics || []).map(([name, count]) => `${name} (${count})`).join(", ") || "n/a"}</div></div>
+  `;
+  q("countryDetailItems").innerHTML = `<div class="item-list">${
+    data.latest_items.map(item => `
+      <article class="item-card">
+        <strong><a href="${item.url}" target="_blank" rel="noreferrer">${item.title}</a></strong>
+        <div class="muted">${item.publisher || "Unknown"} • ${item.published_at || "n/a"}</div>
+        <div class="muted">${item.event_type || "n/a"} • ${item.signal || "n/a"} • ${item.population_type || "n/a"} • confidence ${item.confidence ?? "n/a"}</div>
+      </article>
+    `).join("")
+  }</div>`;
 }
 
 function renderBriefList(data) {
@@ -156,6 +214,15 @@ async function loadBrief() {
   renderBriefList(await fetchJson("/api/briefs", params));
 }
 
+async function loadCountryDetail() {
+  if (!state.selectedCountry) {
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set("country", state.selectedCountry);
+  renderCountryDetail(await fetchJson("/api/country-detail", params));
+}
+
 async function loadFilters() {
   const data = await fetchJson("/api/filters");
   const fill = (id, values) => {
@@ -169,19 +236,23 @@ async function loadFilters() {
 
 async function refresh() {
   const params = currentParams();
-  const [overview, countries, timeseries, flows] = await Promise.all([
+  const [overview, countries, timeseries, flows, mapData] = await Promise.all([
     fetchJson("/api/overview", params),
     fetchJson("/api/countries", params),
     fetchJson("/api/timeseries", params),
     fetchJson("/api/displacement"),
+    fetchJson("/api/map", params),
   ]);
   renderCards(overview.summary);
   renderFreshness(overview.freshness);
   renderBarList("signalBars", overview.top_signals.map(item => ({ signal: item.signal, value: item.items })), "signal");
   renderBarList("eventBars", overview.top_event_types.map(item => ({ event_type: item.event_type, value: item.items })), "event_type");
+  renderMap(mapData);
   renderTimeline(timeseries);
   renderFlows(flows);
   renderCountries(countries.countries || []);
+  const exportLink = q("exportItemsLink");
+  exportLink.href = `/export/items.csv?${params.toString()}`;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

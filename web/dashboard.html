@@ -22,7 +22,10 @@
   <section class="filters panel">
     <div class="panel-head">
       <h2>Filters</h2>
-      <button id="refreshBtn" type="button">Refresh</button>
+      <div class="action-row">
+        <a id="exportItemsLink" href="/export/items.csv">Export filtered CSV</a>
+        <button id="refreshBtn" type="button">Refresh</button>
+      </div>
     </div>
     <div class="filter-grid">
       <label>Country
@@ -49,6 +52,13 @@
   <section class="cards" id="summaryCards"></section>
 
   <section class="layout">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Geographic Hotspots</h2>
+        <span class="muted">Click a marker to drill down</span>
+      </div>
+      <div id="mapView" class="map-box"></div>
+    </article>
     <article class="panel wide">
       <div class="panel-head">
         <h2>Coverage Timeline</h2>
@@ -104,6 +114,23 @@
       <span class="muted">Where coverage and signals are clustering</span>
     </div>
     <div id="countriesTable"></div>
+  </section>
+
+  <section class="layout briefs">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Country Drill-Down</h2>
+      </div>
+      <div id="countryDetailSummary" class="status-list">
+        <div class="status-item">Select a country from the table or map to inspect current items and signals.</div>
+      </div>
+    </article>
+    <article class="panel wide">
+      <div class="panel-head">
+        <h2 id="countryDetailTitle">Country Items</h2>
+      </div>
+      <div id="countryDetailItems"></div>
+    </article>
   </section>
 
   <section class="layout briefs">

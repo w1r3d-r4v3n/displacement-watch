@@ -72,6 +72,18 @@ h2 { font-size: 1.25rem; }
   padding: 10px 16px;
   cursor: pointer;
 }
+.action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.action-row a {
+  text-decoration: none;
+  color: white;
+  background: var(--accent-2);
+  padding: 10px 16px;
+  border-radius: 999px;
+}
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -117,6 +129,43 @@ select, input {
 .chart-box {
   min-height: 280px;
   padding-top: 8px;
+}
+.map-box {
+  min-height: 280px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(31,122,92,0.08), rgba(217,108,63,0.08)),
+    #f8f4ec;
+  position: relative;
+  overflow: hidden;
+}
+.map-canvas {
+  position: relative;
+  width: 100%;
+  height: 280px;
+}
+.map-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(31, 122, 92, 0.82);
+  border: 2px solid white;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(31,122,92,0.22);
+}
+.map-dot.high-risk {
+  background: rgba(185, 76, 42, 0.9);
+}
+.map-legend {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 .svg-chart {
   width: 100%;
@@ -201,6 +250,19 @@ th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
   min-height: 520px;
   max-height: 70vh;
   overflow: auto;
+}
+.item-list {
+  display: grid;
+  gap: 10px;
+}
+.item-card {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 14px;
+  padding: 12px;
+}
+.item-card a {
+  color: var(--ink);
 }
 @media (max-width: 980px) {
   .hero, .layout, .layout.briefs, .filter-grid, .cards {

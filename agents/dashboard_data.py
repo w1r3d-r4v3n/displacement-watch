@@ -4,8 +4,28 @@ import datetime as dt
 import json
 from collections import Counter, defaultdict
 from typing import Any
+import csv
+import io
 
 from . import db as dbmod
+
+COUNTRY_CENTROIDS = {
+    "AF": (33.0, 65.0), "AO": (-12.3, 17.5), "BD": (24.0, 90.0), "BF": (12.2, -1.6),
+    "BI": (-3.4, 29.9), "CF": (6.6, 20.9), "CD": (-2.8, 23.6), "CG": (-0.8, 15.2),
+    "CM": (5.7, 12.7), "CO": (4.6, -74.1), "EC": (-1.8, -78.2), "EG": (26.8, 30.8),
+    "ER": (15.3, 39.3), "ET": (9.1, 40.5), "GN": (10.4, -10.9), "GT": (15.6, -90.2),
+    "HT": (18.9, -72.3), "HN": (14.8, -86.2), "IQ": (33.2, 43.7), "IR": (32.4, 53.7),
+    "JO": (31.2, 36.4), "KE": (0.2, 37.9), "KG": (41.2, 74.8), "KH": (12.6, 104.9),
+    "KZ": (48.0, 67.0), "LB": (33.9, 35.8), "LR": (6.4, -9.4), "LY": (26.3, 17.2),
+    "MA": (31.8, -7.1), "MG": (-18.8, 46.9), "ML": (17.5, -3.9), "MM": (21.2, 96.0),
+    "MR": (20.3, -10.4), "MW": (-13.3, 34.3), "MX": (23.6, -102.5), "MZ": (-18.7, 35.5),
+    "NE": (17.6, 9.4), "NG": (9.1, 8.7), "NI": (12.9, -85.2), "PK": (30.4, 69.3),
+    "PS": (31.9, 35.2), "RW": (-1.9, 29.9), "SD": (15.6, 32.5), "SL": (8.5, -11.8),
+    "SO": (5.2, 46.2), "SS": (7.3, 30.3), "SY": (35.0, 38.5), "TD": (15.4, 18.7),
+    "TJ": (38.6, 71.0), "TN": (34.0, 9.6), "TZ": (-6.3, 34.8), "UA": (49.0, 31.3),
+    "UG": (1.4, 32.3), "UZ": (41.3, 64.6), "VE": (7.0, -66.0), "VN": (16.0, 108.0),
+    "YE": (15.6, 48.5), "ZA": (-30.6, 22.9), "ZM": (-13.1, 27.8), "ZW": (-19.0, 29.2),
+}
 
 
 def _dicts(rows: list[Any]) -> list[dict[str, Any]]:
@@ -179,6 +199,13 @@ def get_country_summary(
 
     out = []
     for code, stat in country_stats.items():
+        media_component = min(40.0, stat["items"] * 1.8)
+        confidence_component = min(15.0, (stat["avg_confidence"] / max(stat["items"], 1)) * 15.0)
+        signal_component = min(20.0, sum(
+            5 if name in ("access_constraint", "protection_risk", "funding_gap", "border_restriction") else 2
+            for name, _count in stat["signals"].most_common(3)
+        ))
+        external_component = 0.0
         out.append({
             "country_code": code,
             "items": stat["items"],
@@ -187,9 +214,50 @@ def get_country_summary(
             "top_event_type": stat["event_types"].most_common(1)[0][0] if stat["event_types"] else None,
             "top_population": stat["populations"].most_common(1)[0][0] if stat["populations"] else None,
             "latest_date": stat["latest_date"],
+            "risk_score": round(media_component + confidence_component + signal_component + external_component, 1),
         })
-    out.sort(key=lambda x: (-x["items"], x["country_code"]))
+    out.sort(key=lambda x: (-x["risk_score"], -x["items"], x["country_code"]))
     return out
+
+
+def get_country_detail(db_path: str, country: str, limit: int = 25) -> dict[str, Any]:
+    conn = dbmod.connect(db_path)
+    rows = _dicts(dbmod.get_all_items(conn))
+    filtered = [r for r in rows if country in _parse_json(r.get("country_codes_json"), [])]
+    filtered.sort(key=lambda r: (r.get("published_at") or r.get("retrieved_at") or ""), reverse=True)
+    ext_rows = _dicts(dbmod.get_external_events(conn, country_code=country))
+    conn.close()
+
+    signal_counter = Counter((r.get("operational_signal") or "monitor") for r in filtered)
+    event_counter = Counter((r.get("event_type") or "unknown") for r in filtered)
+    population_counter = Counter((r.get("population_type") or "mixed_or_unspecified") for r in filtered)
+    latest_items = []
+    for row in filtered[:limit]:
+        latest_items.append({
+            "title": row.get("title"),
+            "publisher": row.get("publisher") or row.get("domain"),
+            "published_at": row.get("published_at") or row.get("retrieved_at"),
+            "event_type": row.get("event_type"),
+            "signal": row.get("operational_signal"),
+            "population_type": row.get("population_type"),
+            "url": row.get("url"),
+            "confidence": row.get("coverage_confidence"),
+        })
+    metrics = Counter()
+    for row in ext_rows:
+        metrics.update([row.get("metric_name") or "unknown_metric"])
+    return {
+        "country_code": country,
+        "summary": {
+            "items": len(filtered),
+            "avg_confidence": round(sum((r.get("coverage_confidence") or 0.0) for r in filtered) / max(len(filtered), 1), 2),
+            "top_signal": signal_counter.most_common(1)[0][0] if signal_counter else None,
+            "top_event_type": event_counter.most_common(1)[0][0] if event_counter else None,
+            "top_population": population_counter.most_common(1)[0][0] if population_counter else None,
+            "external_metrics": metrics.most_common(),
+        },
+        "latest_items": latest_items,
+    }
 
 
 def get_timeseries(db_path: str, country: str | None = None, start: str | None = None, end: str | None = None) -> dict[str, Any]:
@@ -312,3 +380,45 @@ def get_filter_options(db_path: str) -> dict[str, list[str]]:
         "population_types": sorted({r.get("population_type") for r in rows if r.get("population_type")}),
         "signals": sorted({r.get("operational_signal") for r in rows if r.get("operational_signal")}),
     }
+
+
+def get_map_points(db_path: str, start: str | None = None, end: str | None = None) -> dict[str, Any]:
+    countries = get_country_summary(db_path, start=start, end=end)
+    points = []
+    for row in countries:
+        coords = COUNTRY_CENTROIDS.get(row["country_code"])
+        if not coords:
+            continue
+        points.append({
+            "country_code": row["country_code"],
+            "lat": coords[0],
+            "lon": coords[1],
+            "items": row["items"],
+            "risk_score": row["risk_score"],
+            "top_signal": row["top_signal"],
+        })
+    return {"points": points}
+
+
+def build_export_csv_bytes(db_path: str, country: str | None = None, start: str | None = None, end: str | None = None) -> bytes:
+    conn = dbmod.connect(db_path)
+    rows = _dicts(dbmod.get_all_items(conn, start_iso=start, end_iso=end, country_code=country))
+    conn.close()
+    sio = io.StringIO()
+    writer = csv.DictWriter(
+        sio,
+        fieldnames=["title", "publisher", "published_at", "event_type", "population_type", "operational_signal", "coverage_confidence", "url"],
+    )
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({
+            "title": row.get("title"),
+            "publisher": row.get("publisher") or row.get("domain"),
+            "published_at": row.get("published_at") or row.get("retrieved_at"),
+            "event_type": row.get("event_type"),
+            "population_type": row.get("population_type"),
+            "operational_signal": row.get("operational_signal"),
+            "coverage_confidence": row.get("coverage_confidence"),
+            "url": row.get("url"),
+        })
+    return sio.getvalue().encode("utf-8")
