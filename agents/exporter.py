@@ -5,7 +5,7 @@ from typing import Any
 from . import db as dbmod
 from .trends import rolling_trends
 
-CODEBOOK = """# Displacement Watch — Research Data Codebook
+CODEBOOK = """# Displacement Monitor — Research Data Codebook
 
 ## items.csv / selected.csv columns
 

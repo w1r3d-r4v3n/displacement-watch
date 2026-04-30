@@ -135,7 +135,7 @@ def cmd_validate(args):
     # basic report validation
     txt = open(report_path, "r", encoding="utf-8").read()
     required_headers = [
-        "# Displacement Watch Brief",
+        "# Displacement Monitor Brief",
         "## Executive Summary",
         "## Top Developments",
         "## Footnotes",
@@ -300,8 +300,8 @@ def cmd_export_research_package(args):
     print(f"  Files: {list(manifest['files'].keys())}")
 
 def build_parser():
-    p = argparse.ArgumentParser(description="Displacement Watch v2 CLI")
-    p.add_argument("--db", default="displacement_watch.db")
+    p = argparse.ArgumentParser(description="Displacement Monitor v2 CLI")
+    p.add_argument("--db", default="displacement_monitor.db")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("status", help="Show database statistics at a glance")

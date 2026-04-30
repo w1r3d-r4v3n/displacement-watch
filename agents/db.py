@@ -2,7 +2,7 @@ from __future__ import annotations
 import sqlite3, json, os, datetime as dt
 from typing import Iterable, Any
 
-DB_PATH = "displacement_watch.db"
+DB_PATH = "displacement_monitor.db"
 
 SCHEMA_SQL = '''
 PRAGMA journal_mode=WAL;

@@ -64,7 +64,7 @@ def build_report(date_key: str, db_path: str = dbmod.DB_PATH, out_dir: str | Non
     top_dev = [f"{i+1}. **{r['title']}** ({r['publisher']}; {_fmt_date(r['published_at'] or r['retrieved_at'])})<sup>{cite(r)}</sup>" for i,r in enumerate(top_rows)]
 
     lines = []
-    lines.append(f"# Displacement Watch Brief — {date_key}")
+    lines.append(f"# Displacement Monitor Brief — {date_key}")
     lines.append("")
     lines.append("## Executive Summary")
     lines.extend(exec_bullets)

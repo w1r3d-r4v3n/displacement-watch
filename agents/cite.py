@@ -61,7 +61,7 @@ def items_to_bibtex(rows: list, citekey_prefix: str = "dispwatch") -> str:
       - year
       - url
       - urldate (today)
-      - note: source tier and Displacement Watch attribution
+- note: source tier and Displacement Monitor attribution
     """
     today = dt.datetime.utcnow().strftime("%Y-%m-%d")
     entries: list[str] = []
@@ -83,7 +83,7 @@ def items_to_bibtex(rows: list, citekey_prefix: str = "dispwatch") -> str:
             f"  year      = {{{year}}},\n"
             f"  url       = {{{url}}},\n"
             f"  urldate   = {{{today}}},\n"
-            f"  note      = {{Retrieved via Displacement Watch v2. Source tier: {tier}.}}\n"
+            f"  note      = {{Retrieved via Displacement Monitor v2. Source tier: {tier}.}}\n"
             f"}}"
         )
         entries.append(entry)
@@ -127,7 +127,7 @@ def items_to_ris(rows: list) -> str:
             lines.append(f"DA  - {pub_date}")
         if ret_date:
             lines.append(f"Y2  - {ret_date}")
-        lines.append(f"N1  - Source tier: {tier}. Retrieved via Displacement Watch v2.")
+        lines.append(f"N1  - Source tier: {tier}. Retrieved via Displacement Monitor v2.")
         lines.append("ER  - ")
 
         records.append("\n".join(lines))

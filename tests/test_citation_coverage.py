@@ -1,5 +1,5 @@
 def test_markdown_footnotes_shape():
-    sample = '''# Displacement Watch Brief — 2026-02-20
+    sample = '''# Displacement Monitor Brief — 2026-02-20
 ## Executive Summary
 - Example headline<sup>1</sup>
 ## Top Developments

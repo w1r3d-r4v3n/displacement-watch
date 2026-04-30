@@ -114,7 +114,7 @@ python cli.py export-research-package --out data/exports/pkg/ \
 
 ## Database schema
 
-Key tables in `displacement_watch.db`:
+Key tables in `displacement_monitor.db`:
 
 | Table | Contents |
 |-------|----------|
@@ -128,7 +128,7 @@ Key tables in `displacement_watch.db`:
 
 ## Notes
 - Uses RSS where possible, and GDELT Doc API for broad coverage.
-- Stores all collected items and selections in `displacement_watch.db` (SQLite).
+- Stores all collected items and selections in `displacement_monitor.db` (SQLite).
 - Daily artifacts are written to `data/YYYY-MM-DD/`.
 - Country tagging is offline — no external geocoding service required.
 - `numpy` and `scipy` are required for analytics; `statsmodels` is optional (Granger causality only).

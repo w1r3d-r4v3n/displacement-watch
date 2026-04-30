@@ -222,7 +222,7 @@ def _query_reliefweb_date(date_iso: str, query_pack: dict, run_id: str, limit: i
         "sort": ["date.created:desc"],
     }
     try:
-        r = requests.post(f"{RELIEFWEB_API}?appname=displacement-watch", json=payload, timeout=30)
+        r = requests.post(f"{RELIEFWEB_API}?appname=displacement-monitor", json=payload, timeout=30)
         r.raise_for_status()
         data = r.json()
     except Exception as exc:
