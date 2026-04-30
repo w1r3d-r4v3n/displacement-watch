@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Displacement Monitor Dashboard</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Local Research Dashboard</p>
+      <h1>Displacement Monitor</h1>
+      <p class="lede">A browser-based workspace for coverage trends, operational signals, displacement flows, and daily briefs.</p>
+    </div>
+    <div class="hero-note">
+      <strong>Designed for researchers and humanitarian teams</strong>
+      <span>Local-first, SQLite-backed, and built from your existing pipeline.</span>
+    </div>
+  </header>
+
+  <section class="filters panel">
+    <div class="panel-head">
+      <h2>Filters</h2>
+      <button id="refreshBtn" type="button">Refresh</button>
+    </div>
+    <div class="filter-grid">
+      <label>Country
+        <select id="countryFilter"><option value="">All countries</option></select>
+      </label>
+      <label>Event type
+        <select id="eventFilter"><option value="">All event types</option></select>
+      </label>
+      <label>Population
+        <select id="populationFilter"><option value="">All populations</option></select>
+      </label>
+      <label>Operational signal
+        <select id="signalFilter"><option value="">All signals</option></select>
+      </label>
+      <label>Start date
+        <input id="startFilter" type="date">
+      </label>
+      <label>End date
+        <input id="endFilter" type="date">
+      </label>
+    </div>
+  </section>
+
+  <section class="cards" id="summaryCards"></section>
+
+  <section class="layout">
+    <article class="panel wide">
+      <div class="panel-head">
+        <h2>Coverage Timeline</h2>
+        <span id="timelineHint" class="muted">Media coverage and external metrics</span>
+      </div>
+      <div id="timelineChart" class="chart-box"></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Source Freshness</h2>
+      </div>
+      <div id="freshnessList" class="status-list"></div>
+    </article>
+  </section>
+
+  <section class="layout">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Top Signals</h2>
+      </div>
+      <div id="signalBars"></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Top Event Types</h2>
+      </div>
+      <div id="eventBars"></div>
+    </article>
+  </section>
+
+  <section class="layout">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Origins</h2>
+        <span class="muted">Latest displacement outflows</span>
+      </div>
+      <div id="originsTable"></div>
+    </article>
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Hosts</h2>
+        <span class="muted">Latest displacement host burdens</span>
+      </div>
+      <div id="hostsTable"></div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Country Summary</h2>
+      <span class="muted">Where coverage and signals are clustering</span>
+    </div>
+    <div id="countriesTable"></div>
+  </section>
+
+  <section class="layout briefs">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Daily Briefs</h2>
+      </div>
+      <div id="briefList" class="brief-list"></div>
+    </article>
+    <article class="panel wide">
+      <div class="panel-head">
+        <h2 id="briefTitle">Brief Viewer</h2>
+      </div>
+      <pre id="briefContent" class="brief-content">Choose a report date to view the generated markdown brief.</pre>
+    </article>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

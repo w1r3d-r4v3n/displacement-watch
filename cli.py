@@ -1,6 +1,5 @@
 from __future__ import annotations
 import argparse, os, json, datetime as dt, time
-from jsonschema import validate as js_validate
 
 from agents import db as dbmod
 from agents.collector import collect_and_persist, backfill_date
@@ -8,6 +7,7 @@ from agents.refiner import propose
 from agents.writer import build_report
 from agents.editor import qa_and_append
 from agents.export_docx import markdown_to_docx
+from agents.dashboard_server import run_dashboard_server
 
 def cmd_status(args):
     if not os.path.exists(args.db):
@@ -299,6 +299,10 @@ def cmd_export_research_package(args):
     print(f"Research package written to {args.out}")
     print(f"  Files: {list(manifest['files'].keys())}")
 
+def cmd_serve_dashboard(args):
+    dbmod.init_db(args.db)
+    run_dashboard_server(db_path=args.db, host=args.host, port=args.port)
+
 def build_parser():
     p = argparse.ArgumentParser(description="Displacement Monitor v2 CLI")
     p.add_argument("--db", default="displacement_monitor.db")
@@ -372,6 +376,11 @@ def build_parser():
     a.add_argument("--end", default=None)
     a.add_argument("--include-external", action="store_true", help="Include external_events.csv")
     a.set_defaults(func=cmd_export_research_package)
+
+    a = sub.add_parser("serve-dashboard", help="Launch the local browser dashboard")
+    a.add_argument("--host", default="127.0.0.1")
+    a.add_argument("--port", type=int, default=8765)
+    a.set_defaults(func=cmd_serve_dashboard)
 
     return p
 

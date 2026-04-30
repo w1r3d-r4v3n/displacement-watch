@@ -2,6 +2,8 @@
 
 A multi-agent monitoring pipeline for displaced people/refugee coverage in news and humanitarian sources, with research-grade data exports and predictive analytics.
 
+The project also includes a lightweight browser dashboard for researchers and humanitarian workers who want a faster way to explore trends, country patterns, displacement flows, and archived daily briefs.
+
 ## What it does
 - Collects items from RSS + GDELT (legal/ToS-friendly sources)
 - Deduplicates and persists items in SQLite
@@ -61,6 +63,30 @@ python cli.py run-daily [--since-hours 24] [--max-gdelt 100] [--refine] [--expor
 
 # Validate a generated report
 python cli.py validate --date YYYY-MM-DD
+
+# Launch the local dashboard in your browser
+python cli.py serve-dashboard [--host 127.0.0.1] [--port 8765]
+```
+
+### Browser dashboard
+The browser dashboard is a local-first view over `displacement_monitor.db`. It is meant to make the monitor easier to use for exploratory analysis and brief review without turning the project into a heavyweight web app.
+
+Current dashboard views include:
+- summary cards for items, reports, anomalies, and confidence
+- a coverage timeline with external metric overlays
+- source freshness cards for external data providers
+- `Origins` and `Hosts` displacement tables with simple crisis badges
+- country summary tables with top signals and event types
+- a daily brief viewer for generated markdown reports
+
+Run:
+```bash
+python cli.py serve-dashboard
+```
+
+Then open:
+```text
+http://127.0.0.1:8765/dashboard
 ```
 
 ### Historical backfill
@@ -140,3 +166,6 @@ Key tables in `displacement_monitor.db`:
 - Do not scrape disallowed sites.
 - ACLED data requires free researcher registration at acleddata.com.
 - IDMC and UNHCR Stats data are subject to their respective terms of use.
+
+## Inspiration
+- Product inspiration for the browser-based exploration layer came in part from [World Monitor](https://github.com/koala73/worldmonitor), especially its emphasis on making complex monitoring outputs easier to scan visually. This project remains a separate, narrower displacement-focused codebase and does not reuse World Monitor code.
