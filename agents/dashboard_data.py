@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from typing import Any
 import csv
 import io
+import zipfile
 
 from . import db as dbmod
 
@@ -74,6 +75,22 @@ def _item_matches(
     if signal and row.get("operational_signal") != signal:
         return False
     return True
+
+
+def _external_metrics_by_country(
+    conn: Any,
+    start: str | None = None,
+    end: str | None = None,
+) -> dict[str, dict[str, float]]:
+    rows = _dicts(dbmod.get_external_events(conn, start_iso=start, end_iso=end))
+    out: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    for row in rows:
+        code = row.get("country_code")
+        metric = row.get("metric_name") or "unknown_metric"
+        if not code:
+            continue
+        out[code][metric] += float(row.get("metric_value") or 0.0)
+    return out
 
 
 def get_overview(
@@ -172,6 +189,7 @@ def get_country_summary(
 ) -> list[dict[str, Any]]:
     conn = dbmod.connect(db_path)
     rows = _dicts(dbmod.get_all_items(conn, start_iso=start, end_iso=end))
+    external_by_country = _external_metrics_by_country(conn, start=start, end=end)
     country_stats: dict[str, dict[str, Any]] = defaultdict(lambda: {
         "country_code": "",
         "items": 0,
@@ -205,7 +223,18 @@ def get_country_summary(
             5 if name in ("access_constraint", "protection_risk", "funding_gap", "border_restriction") else 2
             for name, _count in stat["signals"].most_common(3)
         ))
-        external_component = 0.0
+        ext = external_by_country.get(code, {})
+        fatalities = ext.get("fatalities", 0.0)
+        idp_stock = ext.get("idp_stock", 0.0)
+        refugee_stock = ext.get("refugee_stock", 0.0)
+        asylum_stock = ext.get("asylum_seeker_stock", 0.0)
+        external_component = min(
+            25.0,
+            min(10.0, fatalities / 500.0)
+            + min(8.0, idp_stock / 250000.0)
+            + min(5.0, refugee_stock / 250000.0)
+            + min(2.0, asylum_stock / 100000.0)
+        )
         out.append({
             "country_code": code,
             "items": stat["items"],
@@ -215,6 +244,18 @@ def get_country_summary(
             "top_population": stat["populations"].most_common(1)[0][0] if stat["populations"] else None,
             "latest_date": stat["latest_date"],
             "risk_score": round(media_component + confidence_component + signal_component + external_component, 1),
+            "risk_components": {
+                "media": round(media_component, 1),
+                "confidence": round(confidence_component, 1),
+                "signals": round(signal_component, 1),
+                "external": round(external_component, 1),
+            },
+            "external_snapshot": {
+                "fatalities": round(fatalities, 1),
+                "idp_stock": round(idp_stock, 1),
+                "refugee_stock": round(refugee_stock, 1),
+                "asylum_seeker_stock": round(asylum_stock, 1),
+            },
         })
     out.sort(key=lambda x: (-x["risk_score"], -x["items"], x["country_code"]))
     return out
@@ -226,6 +267,7 @@ def get_country_detail(db_path: str, country: str, limit: int = 25) -> dict[str,
     filtered = [r for r in rows if country in _parse_json(r.get("country_codes_json"), [])]
     filtered.sort(key=lambda r: (r.get("published_at") or r.get("retrieved_at") or ""), reverse=True)
     ext_rows = _dicts(dbmod.get_external_events(conn, country_code=country))
+    country_summary = next((row for row in get_country_summary(db_path, country=country) if row["country_code"] == country), None)
     conn.close()
 
     signal_counter = Counter((r.get("operational_signal") or "monitor") for r in filtered)
@@ -258,6 +300,9 @@ def get_country_detail(db_path: str, country: str, limit: int = 25) -> dict[str,
             "signal_breakdown": signal_counter.most_common(),
             "event_breakdown": event_counter.most_common(),
             "population_breakdown": population_counter.most_common(),
+            "risk_score": (country_summary or {}).get("risk_score"),
+            "risk_components": (country_summary or {}).get("risk_components", {}),
+            "external_snapshot": (country_summary or {}).get("external_snapshot", {}),
         },
         "latest_items": latest_items,
     }
@@ -425,3 +470,70 @@ def build_export_csv_bytes(db_path: str, country: str | None = None, start: str 
             "url": row.get("url"),
         })
     return sio.getvalue().encode("utf-8")
+
+
+def build_share_bundle_bytes(
+    db_path: str,
+    country: str | None = None,
+    event_type: str | None = None,
+    population_type: str | None = None,
+    signal: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+) -> bytes:
+    overview = get_overview(
+        db_path,
+        country=country,
+        event_type=event_type,
+        population_type=population_type,
+        signal=signal,
+        start=start,
+        end=end,
+    )
+    countries = get_country_summary(
+        db_path,
+        country=country,
+        event_type=event_type,
+        population_type=population_type,
+        signal=signal,
+        start=start,
+        end=end,
+    )
+    timeseries = get_timeseries(db_path, country=country, start=start, end=end)
+    briefs = get_briefs(db_path)
+    filters = {
+        "country": country,
+        "event_type": event_type,
+        "population_type": population_type,
+        "signal": signal,
+        "start": start,
+        "end": end,
+    }
+    csv_bytes = build_export_csv_bytes(db_path, country=country, start=start, end=end)
+
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("filters.json", json.dumps(filters, indent=2))
+        zf.writestr("overview.json", json.dumps(overview, indent=2))
+        zf.writestr("countries.json", json.dumps({"countries": countries}, indent=2))
+        zf.writestr("timeseries.json", json.dumps(timeseries, indent=2))
+        zf.writestr("briefs.json", json.dumps({"reports": briefs.get("reports", [])[:10]}, indent=2))
+        zf.writestr("items.csv", csv_bytes)
+        summary_md = [
+            "# Displacement Monitor Share Bundle",
+            "",
+            "## Filters",
+            f"- country: {country or 'all'}",
+            f"- event_type: {event_type or 'all'}",
+            f"- population_type: {population_type or 'all'}",
+            f"- signal: {signal or 'all'}",
+            f"- start: {start or 'none'}",
+            f"- end: {end or 'none'}",
+            "",
+            "## Overview",
+            f"- items: {overview['summary']['items']}",
+            f"- anomaly_days: {overview['summary']['anomaly_days']}",
+            f"- avg_confidence: {overview['summary']['avg_confidence']}",
+        ]
+        zf.writestr("README.md", "\n".join(summary_md) + "\n")
+    return mem.getvalue()

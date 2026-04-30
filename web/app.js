@@ -187,6 +187,7 @@ function renderCountryDetail(data) {
   const eventRows = (data.summary.event_breakdown || []).slice(0, 5);
   q("countryDetailSummary").innerHTML = `
     <div class="status-item"><strong>Items</strong><div class="muted">${data.summary.items}</div></div>
+    <div class="status-item"><strong>Risk score</strong><div class="muted">${data.summary.risk_score ?? "n/a"}</div></div>
     <div class="status-item"><strong>Average confidence</strong><div class="muted">${data.summary.avg_confidence}</div></div>
     <div class="status-item"><strong>Top signal</strong><div class="muted">${data.summary.top_signal || "n/a"}</div></div>
     <div class="status-item"><strong>Top event</strong><div class="muted">${data.summary.top_event_type || "n/a"}</div></div>
@@ -194,6 +195,14 @@ function renderCountryDetail(data) {
     <div class="status-item"><strong>External metrics</strong><div class="muted">${(data.summary.external_metrics || []).map(([name, count]) => `${name} (${count})`).join(", ") || "n/a"}</div></div>
   `;
   q("countryDetailCharts").innerHTML = `
+    <section class="mini-chart">
+      <h3>Risk components</h3>
+      ${Object.entries(data.summary.risk_components || {}).map(([name, value]) => `<div class="muted">${name}: ${value}</div>`).join("") || `<div class="muted">n/a</div>`}
+    </section>
+    <section class="mini-chart">
+      <h3>External metric snapshot</h3>
+      ${Object.entries(data.summary.external_snapshot || {}).map(([name, value]) => `<div class="muted">${name}: ${value}</div>`).join("") || `<div class="muted">n/a</div>`}
+    </section>
     <section class="mini-chart">
       <h3>Operational signal mix</h3>
       ${signalRows.map(([name, count]) => `<div class="muted">${name}: ${count}</div>`).join("") || `<div class="muted">n/a</div>`}
@@ -304,6 +313,7 @@ async function refresh() {
   renderFlows(flows);
   renderCountries(countries.countries || []);
   q("exportItemsLink").href = `/export/items.csv?${params.toString()}`;
+  q("shareBundleLink").href = `/export/share-bundle.zip?${params.toString()}`;
   if (q("countryFilter").value) {
     state.selectedCountry = q("countryFilter").value;
     await loadCountryDetail();

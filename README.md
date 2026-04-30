@@ -82,6 +82,7 @@ Current dashboard views include:
 - country drill-down panels with recent items, external metric summaries, and signal/event mix summaries
 - local saved filter presets for recurring research workflows
 - filtered CSV export directly from the browser dashboard
+- downloadable share bundles that package the active filtered view as JSON + CSV
 - a daily brief viewer for generated markdown reports
 
 Run:

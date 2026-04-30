@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from . import db as dbmod
 from .dashboard_data import (
     build_export_csv_bytes,
+    build_share_bundle_bytes,
     get_briefs,
     get_country_detail,
     get_country_summary,
@@ -118,6 +119,17 @@ def run_dashboard_server(db_path: str = dbmod.DB_PATH, host: str = "127.0.0.1", 
                     end=params.get("end"),
                 )
                 return self._send_bytes(raw, "text/csv; charset=utf-8", "displacement-monitor-items.csv")
+            if route == "/export/share-bundle.zip":
+                raw = build_share_bundle_bytes(
+                    db_path,
+                    country=params.get("country"),
+                    event_type=params.get("event_type"),
+                    population_type=params.get("population_type"),
+                    signal=params.get("signal"),
+                    start=params.get("start"),
+                    end=params.get("end"),
+                )
+                return self._send_bytes(raw, "application/zip", "displacement-monitor-share-bundle.zip")
 
             self._send_json({"error": "Not found", "path": route}, status=HTTPStatus.NOT_FOUND)
 
